@@ -1,0 +1,6 @@
+# 百度智能云-人工智能-机器翻译
+api:
+  pictrans: https://aip.baidubce.com/file/2.0/mt/pictrans/v1  # 图片翻译
+  access_token: https://aip.baidubce.com/oauth/2.0/token # 获取access_token
+ak: QYuVcUhC7sB5s16nVCljrnNJ
+sk: EQlhSsG3bT0iKq6LmJMpLnDpfVuQkf7t
