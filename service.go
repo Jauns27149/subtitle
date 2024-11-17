@@ -1,13 +1,7 @@
 package main
 
-import (
-	"IELTS/translation"
-	"fmt"
-)
+import "IELTS/translation"
 
 func main() {
-	yaml := translation.ReadYaml()
-	//token := translation.GetAccessToken(yaml)
-	pictrans := translation.Pictrans(yaml, "translation/english.png")
-	fmt.Println(pictrans.Data.SumDst)
+	translation.PdfTrans("pastPapers/剑桥雅思真题18.pdf")
 }

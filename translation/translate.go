@@ -3,13 +3,17 @@ package translation
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
+	"github.com/davidbyttow/govips/v2/vips"
 	"io"
 	"log"
 	"mime/multipart"
 	"net/http"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
+	"sync"
 )
 
 type PictransRes struct {
@@ -35,7 +39,50 @@ type PictransRes struct {
 	} `json:"data"`
 }
 
-func Pictrans(t Translation, filePath string) PictransRes {
+func PdfTrans(path string) {
+	vips.Startup(nil)
+	defer vips.Shutdown()
+
+	file, err := vips.NewImageFromFile(path)
+	checkError(err)
+	pages := file.Pages()
+	qps := 3
+	pageChan := make(chan int, pages)
+	for page := range pages {
+		pageChan <- page
+	}
+	trans := ReadYaml()
+	group := sync.WaitGroup{}
+	group.Add(qps)
+	sumdst := make(map[int]string)
+	close(pageChan)
+	for range qps {
+		go func() {
+			for {
+				if page, ok := <-pageChan; ok {
+					pictrans := Pictrans(trans, path, page)
+					sumdst[page] = pictrans.Data.SumDst
+				} else {
+					break
+				}
+			}
+			group.Done()
+		}()
+	}
+	group.Wait()
+	fileName := path[strings.LastIndex(path, "/")+1 : strings.LastIndex(path, ".")]
+	md, err := os.Create("interpret/" + fileName + ".md")
+	checkError(err)
+	for k := range len(sumdst) {
+		v := "# " + strconv.Itoa(k) + "\n" + sumdst[k] + "\n\n\n"
+		_, err = md.Write([]byte(v))
+		checkError(err)
+	}
+	err = md.Close()
+	checkError(err)
+}
+
+func Pictrans(t Translation, filePath string, page int) PictransRes {
 	u, err := url.Parse(t.Api.Pictrans)
 	if err != nil {
 		log.Fatal(err)
@@ -53,37 +100,23 @@ func Pictrans(t Translation, filePath string) PictransRes {
 	}
 	for k, v := range param {
 		err = writer.WriteField(k, v)
-		if err != nil {
-			log.Fatal(err)
-		}
+		checkError(err)
 	}
 
-	file, err := os.Open(filePath)
-	if err != nil {
-		log.Fatalf("Failed to open file: %s", err)
-	}
-	defer func(file *os.File) {
-		err = file.Close()
-		if err != nil {
-			log.Fatal(err)
-		}
-	}(file)
-	if filePath == "" {
-		log.Fatal("File path is empty")
-	}
+	params := vips.NewImportParams()
+	params.Page.Set(page)
+	image, err := vips.LoadImageFromFile(filePath, params)
+	checkError(err)
+	jpeg, _, err := image.ExportJpeg(&vips.JpegExportParams{})
+	checkError(err)
+	buffer := bytes.NewBuffer(jpeg)
 	index := strings.LastIndex(filePath, "/")
 	formFile, err := writer.CreateFormFile("image", filePath[index+1:])
-	if err != nil {
-		log.Fatalf("CreateFormFile failed: %s", err)
-	}
-	_, err = io.Copy(formFile, file)
-	if err != nil {
-		log.Fatalf("io.Copy failed: %s", err)
-	}
+	checkError(err)
+	_, err = io.Copy(formFile, buffer)
+	checkError(err)
 	err = writer.Close()
-	if err != nil {
-		log.Fatalf("writer.Close failed: %s", err)
-	}
+	checkError(err)
 
 	req, err := http.NewRequest("POST", u.String(), &b)
 	req.Header.Set("Content-Type", writer.FormDataContentType())
@@ -106,6 +139,7 @@ func Pictrans(t Translation, filePath string) PictransRes {
 	response := PictransRes{}
 	err = json.Unmarshal(body, &response)
 	if err != nil {
+		fmt.Println(string(body))
 		log.Fatalf("json.Unmarshal failed: %s", err)
 	}
 	return response
@@ -151,4 +185,11 @@ func GetAccessToken(t Translation) string {
 	s := string(body)
 	i := strings.Index(s, "access_token") + 15
 	return s[i : i+71]
+}
+
+func checkError(err error) {
+	if err != nil {
+		fmt.Println("error:", err)
+		os.Exit(1)
+	}
 }
