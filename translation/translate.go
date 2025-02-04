@@ -4,17 +4,25 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/davidbyttow/govips/v2/vips"
+	"github.com/Jauns27149/subtitle/model"
+	"github.com/Jauns27149/subtitle/tools"
+	"gopkg.in/yaml.v3"
 	"io"
 	"log"
-	"mime/multipart"
 	"net/http"
 	"net/url"
 	"os"
-	"strconv"
 	"strings"
-	"sync"
 )
+
+var t = tools.Translation{}
+
+func init() {
+	file, err := os.ReadFile("translation/config.yaml")
+	checkError(err)
+	err = yaml.Unmarshal(file, &t)
+	checkError(err)
+}
 
 type PictransRes struct {
 	ErrorCode string `json:"error_code"`
@@ -39,113 +47,113 @@ type PictransRes struct {
 	} `json:"data"`
 }
 
-func PdfTrans(path string) {
-	vips.Startup(nil)
-	defer vips.Shutdown()
+//func PdfTrans(path string) {
+//	vips.Startup(nil)
+//	defer vips.Shutdown()
+//
+//	file, err := vips.NewImageFromFile(path)
+//	checkError(err)
+//	pages := file.Pages()
+//	qps := 3
+//	pageChan := make(chan int, pages)
+//	for page := range pages {
+//		pageChan <- page
+//	}
+//	trans := ReadYaml()
+//	group := sync.WaitGroup{}
+//	group.Add(qps)
+//	sumdst := make(map[int]string)
+//	close(pageChan)
+//	for range qps {
+//		go func() {
+//			for {
+//				if page, ok := <-pageChan; ok {
+//					pictrans := Pictrans(trans, path, page)
+//					sumdst[page] = pictrans.Data.SumDst
+//				} else {
+//					break
+//				}
+//			}
+//			group.Done()
+//		}()
+//	}
+//	group.Wait()
+//	fileName := path[strings.LastIndex(path, "/")+1 : strings.LastIndex(path, ".")]
+//	md, err := os.Create("interpret/" + fileName + ".md")
+//	checkError(err)
+//	for k := range len(sumdst) {
+//		v := "# " + strconv.Itoa(k) + "\n" + sumdst[k] + "\n\n\n"
+//		_, err = md.Write([]byte(v))
+//		checkError(err)
+//	}
+//	err = md.Close()
+//	checkError(err)
+//}
 
-	file, err := vips.NewImageFromFile(path)
-	checkError(err)
-	pages := file.Pages()
-	qps := 3
-	pageChan := make(chan int, pages)
-	for page := range pages {
-		pageChan <- page
-	}
-	trans := ReadYaml()
-	group := sync.WaitGroup{}
-	group.Add(qps)
-	sumdst := make(map[int]string)
-	close(pageChan)
-	for range qps {
-		go func() {
-			for {
-				if page, ok := <-pageChan; ok {
-					pictrans := Pictrans(trans, path, page)
-					sumdst[page] = pictrans.Data.SumDst
-				} else {
-					break
-				}
-			}
-			group.Done()
-		}()
-	}
-	group.Wait()
-	fileName := path[strings.LastIndex(path, "/")+1 : strings.LastIndex(path, ".")]
-	md, err := os.Create("interpret/" + fileName + ".md")
-	checkError(err)
-	for k := range len(sumdst) {
-		v := "# " + strconv.Itoa(k) + "\n" + sumdst[k] + "\n\n\n"
-		_, err = md.Write([]byte(v))
-		checkError(err)
-	}
-	err = md.Close()
-	checkError(err)
-}
+//func Pictrans(t Translation, filePath string, page int) PictransRes {
+//	u, err := url.Parse(t.Api.Pictrans)
+//	if err != nil {
+//		log.Fatal(err)
+//	}
+//	u.RawQuery = url.Values{
+//		"access_token": {GetAccessToken(t)},
+//	}.Encode()
+//
+//	var b bytes.Buffer
+//	writer := multipart.NewWriter(&b)
+//	param := map[string]string{
+//		"v":    "3",
+//		"from": "en",
+//		"to":   "zh",
+//	}
+//	for k, v := range param {
+//		err = writer.WriteField(k, v)
+//		checkError(err)
+//	}
+//
+//	params := vips.NewImportParams()
+//	params.Page.Set(page)
+//	image, err := vips.LoadImageFromFile(filePath, params)
+//	checkError(err)
+//	jpeg, _, err := image.ExportJpeg(&vips.JpegExportParams{})
+//	checkError(err)
+//	buffer := bytes.NewBuffer(jpeg)
+//	index := strings.LastIndex(filePath, "/")
+//	formFile, err := writer.CreateFormFile("image", filePath[index+1:])
+//	checkError(err)
+//	_, err = io.Copy(formFile, buffer)
+//	checkError(err)
+//	err = writer.Close()
+//	checkError(err)
+//
+//	req, err := http.NewRequest("POST", u.String(), &b)
+//	req.Header.Set("Content-Type", writer.FormDataContentType())
+//	client := &http.Client{}
+//	resp, err := client.Do(req)
+//	if err != nil {
+//		log.Fatalf("client.Do failed: %s", err)
+//	}
+//	defer func(Body io.ReadCloser) {
+//		err = Body.Close()
+//		if err != nil {
+//			log.Fatal(err)
+//		}
+//	}(resp.Body)
+//
+//	body, err := io.ReadAll(resp.Body)
+//	if err != nil {
+//		log.Fatalf("ReadAll failed: %s", err)
+//	}
+//	response := PictransRes{}
+//	err = json.Unmarshal(body, &response)
+//	if err != nil {
+//		fmt.Println(string(body))
+//		log.Fatalf("json.Unmarshal failed: %s", err)
+//	}
+//	return response
+//}
 
-func Pictrans(t Translation, filePath string, page int) PictransRes {
-	u, err := url.Parse(t.Api.Pictrans)
-	if err != nil {
-		log.Fatal(err)
-	}
-	u.RawQuery = url.Values{
-		"access_token": {GetAccessToken(t)},
-	}.Encode()
-
-	var b bytes.Buffer
-	writer := multipart.NewWriter(&b)
-	param := map[string]string{
-		"v":    "3",
-		"from": "en",
-		"to":   "zh",
-	}
-	for k, v := range param {
-		err = writer.WriteField(k, v)
-		checkError(err)
-	}
-
-	params := vips.NewImportParams()
-	params.Page.Set(page)
-	image, err := vips.LoadImageFromFile(filePath, params)
-	checkError(err)
-	jpeg, _, err := image.ExportJpeg(&vips.JpegExportParams{})
-	checkError(err)
-	buffer := bytes.NewBuffer(jpeg)
-	index := strings.LastIndex(filePath, "/")
-	formFile, err := writer.CreateFormFile("image", filePath[index+1:])
-	checkError(err)
-	_, err = io.Copy(formFile, buffer)
-	checkError(err)
-	err = writer.Close()
-	checkError(err)
-
-	req, err := http.NewRequest("POST", u.String(), &b)
-	req.Header.Set("Content-Type", writer.FormDataContentType())
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	if err != nil {
-		log.Fatalf("client.Do failed: %s", err)
-	}
-	defer func(Body io.ReadCloser) {
-		err = Body.Close()
-		if err != nil {
-			log.Fatal(err)
-		}
-	}(resp.Body)
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		log.Fatalf("ReadAll failed: %s", err)
-	}
-	response := PictransRes{}
-	err = json.Unmarshal(body, &response)
-	if err != nil {
-		fmt.Println(string(body))
-		log.Fatalf("json.Unmarshal failed: %s", err)
-	}
-	return response
-}
-
-func GetAccessToken(t Translation) string {
+func GetAccessToken(t tools.Translation) string {
 	u, err := url.Parse(t.Api.AccessToken)
 	if err != nil {
 		log.Fatalf("url.Parse failed: %s", err)
@@ -192,4 +200,60 @@ func checkError(err error) {
 		fmt.Println("error:", err)
 		os.Exit(1)
 	}
+}
+
+func Texttrans(str string) string {
+	u, err := url.Parse(t.Api.Texttrans)
+	if err != nil {
+		log.Fatal(err)
+	}
+	u.RawQuery = url.Values{
+		"access_token": {GetAccessToken(t)},
+	}.Encode()
+
+	param := map[string]string{
+		//"from": "en",
+		"from": "de",
+		"to":   "zh",
+		"q":    str,
+	}
+	payload, err := json.Marshal(param)
+	tools.CheckErr(err)
+	b := bytes.NewBuffer(payload)
+	checkError(err)
+
+	req, err := http.NewRequest("POST", u.String(), b)
+	req.Header.Add("Content-Type", "application/json")
+	req.Header.Add("Accept", "application/json")
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		log.Fatalf("client.Do failed: %s", err)
+	}
+	defer func(Body io.ReadCloser) {
+		err = Body.Close()
+		if err != nil {
+			log.Fatal(err)
+		}
+	}(resp.Body)
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		log.Fatalf("ReadAll failed: %s", err)
+	}
+	response := model.ResponseTexttrans{}
+	err = json.Unmarshal(body, &response)
+	if err != nil {
+		fmt.Println(string(body))
+		log.Fatalf("json.Unmarshal failed: %s", err)
+	}
+
+	var result []string
+	for _, v := range response.Result.TransResult {
+		result = append(result, v.Dst)
+	}
+	if len(result) == 0 {
+		log.Fatal("No translation result: ", body)
+	}
+	return strings.Join(result, "\n")
 }

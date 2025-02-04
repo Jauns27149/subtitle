@@ -1,4 +1,4 @@
-package translation
+package tools
 
 import (
 	"gopkg.in/yaml.v3"
@@ -10,6 +10,7 @@ type Translation struct {
 	Api struct {
 		Pictrans    string `yaml:"pictrans"`
 		AccessToken string `yaml:"access_token"`
+		Texttrans   string `yaml:"texttrans"`
 	} `yaml:"api"`
 	AK string `yaml:"ak"`
 	SK string `yaml:"sk"`
@@ -26,4 +27,10 @@ func ReadYaml() Translation {
 		log.Fatal(err)
 	}
 	return transfer
+}
+
+func CheckErr(err error) {
+	if err != nil {
+		log.Fatal(err)
+	}
 }
